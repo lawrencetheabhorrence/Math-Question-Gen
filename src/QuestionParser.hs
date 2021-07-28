@@ -64,20 +64,39 @@ subValues dict template = concat . reverse $ buildResult (words template) []
     buildResult (w:ws) result = buildResult ws (w : result)
 
 -- handling choice generation
-generateChoices :: (Show a) => a -> [String] -> [String]
-generateChoices a choices = zipWith (++) (map (++ ". ") ["A", "B", "C", "D", "E"]) (show a : choices)
+generateChoices :: [String] -> [String]
+generateChoices choices = zipWith (++) (map (++ ". ") ["A", "B", "C", "D", "E"]) choices
 
--- now this is where we handle I/O and random generation
--- both of which we cannot do with pure functions
-main = do
-  let q = "%i1 %i2 %d %t3 Camilla's favorite numbers"
+substituteValues :: String -> IO String
+substituteValues q = do
   let formatters = getLabels q
   gens <- replicateM (length formatters) Rand.randomIO
   let seeds = map (Rand.mkStdGen) gens
   let valParams = zip seeds formatters
   let values = [uncurry genValue p | p <- valParams]
-  putStrLn (subValues values q)
-  gens <- replicateM 5 Rand.randomIO
+  return (subValues values q)
+
+genChoiceRand :: IO [String]
+genChoiceRand = do
+  gens <- replicateM 4 Rand.randomIO
   let choiceSeeds = map (Rand.mkStdGen) gens
-  let choices = [generateInt seed | seed <- choiceSeeds]
-  putStrLn (show $ generateChoices 1 choices)
+  let choices = (show 1) : [generateInt seed | seed <- choiceSeeds]
+  gen <- Rand.randomIO
+  let choiceGen = Rand.mkStdGen gen
+  let shuffledChoices = randPerm choiceGen choices
+  return (generateChoices shuffledChoices)
+ 
+-- shuffles a list
+randPerm :: (Rand.RandomGen g) => g -> [a] -> [a]
+randPerm _ [] = []
+randPerm gen xs = let (n, newGen) = Rand.randomR (0, length xs - 1) gen
+                      front = xs !! n
+                  in front : randPerm newGen (take n xs ++ drop (n + 1) xs)
+
+-- now this is where we handle I/O and random generation
+-- both of which we cannot do with pure functions
+main = do
+  result <- substituteValues "%i1 %i2 %d %t3 Camilla's favorite numbers"
+  putStrLn result
+  choices <- genChoiceRand
+  putStrLn $ show choices
