@@ -39,7 +39,7 @@ genValue g ('%':c:cs) = (('%':c:cs), genVal c)
 genValue _ _ = ("", "")
 
 generateTime :: Rand.StdGen -> String
-generateTime seed = (show . fst $ Rand.uniformR (1 :: Int, 12 :: Int) seed) ++ ":" ++ (show . fst  $ Rand.uniformR (0 :: Int,  60 :: Int) seed)
+generateTime seed = (show . fst $ Rand.uniformR (1 :: Int, 12 :: Int) seed) ++ ":" ++ (show . fst  $ Rand.uniformR (0 :: Int,  59 :: Int) seed) ++ (pickRand ["AM", "PM"] seed)
 
 generateInt :: Rand.StdGen -> String
 generateInt seed = show . fst $ Rand.uniformR intRange seed
@@ -172,7 +172,7 @@ questionPrompt q = do
   putStrLn result
   choices <- getChoices
   putStrLn $ show choices
-  return $ result ++ "\n" ++ choices
+  return $ result ++ "\n" ++ choices ++ "\n\n"
 
 getQuestions :: FilePath -> IO [String]
 getQuestions path = do
@@ -184,7 +184,8 @@ generateExam :: FilePath -> FilePath -> IO ()
 generateExam inpath outpath = do
   qs <- getQuestions inpath
   outh <- openFile outpath WriteMode
-  seeds <- replicateM 25 (Rand.getStdGen)
+  gens <- replicateM 25 (Rand.randomIO)
+  let seeds = map Rand.mkStdGen gens
   let qtemps = [pickRand qs g | g <- seeds]
   questions <- mapM questionPrompt qtemps
   mapM (hPutStr outh) questions
