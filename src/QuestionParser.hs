@@ -25,7 +25,7 @@ getLabels :: Char -> String -> [String] -- returns the formatters of a question 
 getLabels a s = filter (startswith a) (nub (words s))
 
 intRange :: (Integer, Integer)
-intRange = (30, 300)
+intRange = (1, 110)
 
 genValue :: Rand.StdGen -> String -> (String, String)
 genValue g ('%':c:cs) = (('%':c:cs), genVal c)
@@ -123,7 +123,7 @@ getChoices = do
   generatorCh <- getLine
   let generator = chooseGenerator generatorCh
   choices <- genChoiceRand correct generator
-  return $ show choices
+  return $ show $ concat . intersperse " " $ choices
 
 processQuestion :: String -> IO String
 processQuestion "\n" = do return "\n"
@@ -162,19 +162,30 @@ fillNames s = do
 
 
 main = do
-  result <- substituteValues "!1 has a number. When I added this number to %i1 and multiplied the sum by %i2, the final result is ?1. What is my number?"
-  names <- fillNames result
-  putStrLn names
-  inp <- receiveInputs names
-  putStrLn inp
-  choices <- getChoices
-  putStrLn inp
-  putStrLn choices
+  questionPrompt "!1 has a number. When I added this number to %i1 and multiplied the sum by %i2, the final result is ?1. What is my number?"
 
 questionPrompt :: String -> IO String
-questionPrompt q = do 
-  result <- substituteValues >>= fillNames >>= receiveInputs q
-  choices <- getChoices
+questionPrompt q = do  
+  beforeInputs <- substituteValues q >>= fillNames
+  putStrLn beforeInputs
+  result <- receiveInputs beforeInputs
   putStrLn result
-  putStrLn choices
-  return $ result ++ "\n" ++ show choices
+  choices <- getChoices
+  putStrLn $ show choices
+  return $ result ++ "\n" ++ choices
+
+getQuestions :: FilePath -> IO [String]
+getQuestions path = do
+  inh <- openFile path ReadMode
+  qs <- hGetContents inh
+  return $ lines qs
+
+generateExam :: FilePath -> FilePath -> IO ()
+generateExam inpath outpath = do
+  qs <- getQuestions inpath
+  outh <- openFile outpath WriteMode
+  seeds <- replicateM 25 (Rand.getStdGen)
+  let qtemps = [pickRand qs g | g <- seeds]
+  questions <- mapM questionPrompt qtemps
+  mapM (hPutStr outh) questions
+  hClose outh
